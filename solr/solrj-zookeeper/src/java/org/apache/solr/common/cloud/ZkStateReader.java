@@ -1706,6 +1706,7 @@ public class ZkStateReader implements SolrCloseable {
       return null;
     }
     if (stat != null) {
+      if (stat.getVersion() > c.getZNodeVersion()) return null;
       if (!c.isModified(stat.getVersion(), stat.getCversion())) {
         // we have the latest collection state
         return c;

@@ -1905,6 +1905,7 @@ public class ZkStateReader implements SolrCloseable {
       final String collection, long wait, TimeUnit unit, CollectionStatePredicate predicate)
       throws InterruptedException, TimeoutException {
 
+    log.info("1Waiting up to {}ms for state {}", unit.toMillis(wait), predicate);
     if (closed) {
       throw new AlreadyClosedException();
     }
@@ -1963,6 +1964,8 @@ public class ZkStateReader implements SolrCloseable {
   public DocCollection waitForState(
       final String collection, long wait, TimeUnit unit, Predicate<DocCollection> predicate)
       throws InterruptedException, TimeoutException {
+    log.info("2Waiting up to {}ms for state {}", unit.toMillis(wait), predicate);
+
     if (log.isDebugEnabled()) {
       log.debug("Waiting up to {}ms for state {}", unit.toMillis(wait), predicate);
     }

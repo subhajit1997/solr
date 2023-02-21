@@ -1700,6 +1700,9 @@ public class ZkStateReader implements SolrCloseable {
     Stat stat = null;
     try {
       stat = zkClient.exists(collectionPath, null, false);
+    } catch (InterruptedException ie) {
+      Thread.currentThread().interrupt();
+      return null;
     } catch (Exception e) {
       log.warn("unexpected exception: ",e);
       return null;
@@ -1905,7 +1908,13 @@ public class ZkStateReader implements SolrCloseable {
     if (closed) {
       throw new AlreadyClosedException();
     }
-    DocCollection coll = fetchCachedCollection(collection);
+    DocCollection coll = null;
+    try {
+      coll = fetchCachedCollection(collection);
+    } catch (Exception e) {
+      log.warn("fetch threw exception",e);
+      //do not do anything
+    }
     if (coll != null && predicate.matches(liveNodes, coll)) return;
 
     final CountDownLatch latch = new CountDownLatch(1);
@@ -1960,7 +1969,13 @@ public class ZkStateReader implements SolrCloseable {
     if (closed) {
       throw new AlreadyClosedException();
     }
-    DocCollection coll = fetchCachedCollection(collection);
+    DocCollection coll = null;
+    try {
+      coll = fetchCachedCollection(collection);
+    } catch (Exception e) {
+      log.warn("fetch threw exception",e);
+      //do not do anything
+    }
     if (coll != null && predicate.test(coll)) return coll;
     final CountDownLatch latch = new CountDownLatch(1);
     waitLatches.add(latch);

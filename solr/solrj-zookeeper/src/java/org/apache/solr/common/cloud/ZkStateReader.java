@@ -1914,7 +1914,10 @@ public class ZkStateReader implements SolrCloseable {
       log.warn("fetch threw exception",e);
       //do not do anything
     }
-    if (coll != null && predicate.matches(liveNodes, coll)) return;
+    if (coll != null && predicate.matches(liveNodes, coll)) {
+      log.info("bypassed collection watch");
+      return;
+    }
 
     final CountDownLatch latch = new CountDownLatch(1);
     waitLatches.add(latch);

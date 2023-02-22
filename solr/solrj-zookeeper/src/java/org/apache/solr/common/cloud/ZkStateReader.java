@@ -1904,14 +1904,12 @@ public class ZkStateReader implements SolrCloseable {
   public void waitForState(
       final String collection, long wait, TimeUnit unit, CollectionStatePredicate predicate)
       throws InterruptedException, TimeoutException {
-
-    log.info("1Waiting up to {}ms for state {}", unit.toMillis(wait), predicate);
     if (closed) {
       throw new AlreadyClosedException();
     }
     DocCollection coll = null;
     try {
-      coll = fetchCachedCollection(collection);
+      coll = getCollandLog(collection);
     } catch (Exception e) {
       log.warn("fetch threw exception",e);
       //do not do anything
@@ -1946,6 +1944,23 @@ public class ZkStateReader implements SolrCloseable {
     }
   }
 
+  private DocCollection getCollandLog(String collection) {
+    long start = System.currentTimeMillis();
+    try {
+      return fetchCachedCollection(collection);
+    } finally {
+      long time = System.currentTimeMillis() - start;
+      StringBuilder sb =  new StringBuilder();
+      StackTraceElement[] st = new RuntimeException().getStackTrace();
+      for (int i = 1; i < 5; i++) {
+        StackTraceElement e = st[i];
+        sb.append(e.getMethodName()).append("@").append(e.getLineNumber()).append(" > ");
+      }
+      log.info("fetchCachedCollection. Waited {} callstack : {}", time, sb);
+
+    }
+  }
+
   /**
    * Block until a Predicate returns true, or the wait times out
    *
@@ -1964,7 +1979,6 @@ public class ZkStateReader implements SolrCloseable {
   public DocCollection waitForState(
       final String collection, long wait, TimeUnit unit, Predicate<DocCollection> predicate)
       throws InterruptedException, TimeoutException {
-    log.info("2Waiting up to {}ms for state {}", unit.toMillis(wait), predicate);
 
     if (log.isDebugEnabled()) {
       log.debug("Waiting up to {}ms for state {}", unit.toMillis(wait), predicate);
@@ -1974,7 +1988,7 @@ public class ZkStateReader implements SolrCloseable {
     }
     DocCollection coll = null;
     try {
-      coll = fetchCachedCollection(collection);
+      coll = getCollandLog(collection);
     } catch (Exception e) {
       log.warn("fetch threw exception",e);
       //do not do anything

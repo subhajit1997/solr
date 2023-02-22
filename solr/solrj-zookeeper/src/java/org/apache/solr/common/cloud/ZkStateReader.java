@@ -1915,8 +1915,9 @@ public class ZkStateReader implements SolrCloseable {
       //do not do anything
     }
     if (coll != null && predicate.matches(liveNodes, coll)) {
-      log.info("bypassed collection watch");
       return;
+    } else {
+      log.info("registering actual watcher");
     }
 
     final CountDownLatch latch = new CountDownLatch(1);
@@ -1953,13 +1954,16 @@ public class ZkStateReader implements SolrCloseable {
       return fetchCachedCollection(collection);
     } finally {
       long time = System.currentTimeMillis() - start;
-      StringBuilder sb =  new StringBuilder();
-      StackTraceElement[] st = new RuntimeException().getStackTrace();
-      for (int i = 1; i < 5; i++) {
-        StackTraceElement e = st[i];
-        sb.append(e.getMethodName()).append("@").append(e.getLineNumber()).append(" > ");
+      if(time > 5) {
+        StringBuilder sb = new StringBuilder();
+        StackTraceElement[] st = new RuntimeException().getStackTrace();
+        for (int i = 1; i < 5; i++) {
+          StackTraceElement e = st[i];
+          sb.append(e.getMethodName()).append("@").append(e.getLineNumber()).append(" > ");
+        }
+
+        log.info("fetchCachedCollection. Waited {} callstack : {}", time, sb);
       }
-      log.info("fetchCachedCollection. Waited {} callstack : {}", time, sb);
 
     }
   }

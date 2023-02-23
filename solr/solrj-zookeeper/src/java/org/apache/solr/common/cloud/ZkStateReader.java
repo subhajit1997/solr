@@ -1699,7 +1699,12 @@ public class ZkStateReader implements SolrCloseable {
     if (c == null) return null;
     Stat stat = null;
     try {
+      long start = System.currentTimeMillis();
       stat = zkClient.exists(collectionPath, null, false);
+      long timeTaken = System.currentTimeMillis() - start;
+      if(timeTaken > 5) {
+        log.info("zkClient.exists({}):  {}", collectionPath,timeTaken );
+      }
     } catch (InterruptedException ie) {
       Thread.currentThread().interrupt();
       return null;
@@ -1933,7 +1938,12 @@ public class ZkStateReader implements SolrCloseable {
         };
 
     try {
+      long start = System.currentTimeMillis();
       registerCollectionStateWatcher(collection, watcher);
+      long timeTaken = System.currentTimeMillis() - start;
+      if(timeTaken>5) {
+        log.info("registerCollectionStateWatcher {}ms", timeTaken);
+      }
       // wait for the watcher predicate to return true, or time out
       if (!latch.await(wait, unit))
         throw new TimeoutException(
@@ -2014,7 +2024,12 @@ public class ZkStateReader implements SolrCloseable {
         };
 
     try {
+      long start = System.currentTimeMillis();
       registerDocCollectionWatcher(collection, watcher);
+      long timeTaken = System.currentTimeMillis() - start;
+      if(timeTaken>5) {
+        log.info("registerCollectionStateWatcher {}ms", timeTaken);
+      }
       // wait for the watcher predicate to return true, or time out
       if (!latch.await(wait, unit))
         throw new TimeoutException(

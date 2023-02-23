@@ -831,11 +831,6 @@ public class ZkStateReader implements SolrCloseable {
     }
 
     @Override
-    public DocCollection getOrNull() {
-      return cachedDocCollection;
-    }
-
-    @Override
     public boolean isLazilyLoaded() {
       return true;
     }
@@ -974,7 +969,7 @@ public class ZkStateReader implements SolrCloseable {
     return props.getCoreUrl();
   }
 
-  public Replica getLeader(Set<String> liveNodes, DocCollection docCollection, String shard) {
+  public static Replica getLeader(Set<String> liveNodes, DocCollection docCollection, String shard) {
     Replica replica = docCollection != null ? docCollection.getLeader(shard) : null;
     if (replica != null && liveNodes.contains(replica.getNodeName())) {
       return replica;
@@ -1685,47 +1680,6 @@ public class ZkStateReader implements SolrCloseable {
     }
   }
 
-  /**
-   * fetch the collection that is already cached. This may return a null if it is not already cached
-   * This is an optimization to avoid fetching state if it is not modified. this is particularly
-   * true for PRS collections where state is rarely modified
-   */
-  private DocCollection fetchCachedCollection(String coll) {
-    String collectionPath = DocCollection.getCollectionPath(coll);
-    DocCollection c = null;
-    ClusterState.CollectionRef ref = clusterState.getCollectionRef(coll);
-    if (ref == null) return null;
-    c = ref.getOrNull();
-    if (c == null) return null;
-    Stat stat = null;
-    try {
-      long start = System.currentTimeMillis();
-      stat = zkClient.exists(collectionPath, null, false);
-      long timeTaken = System.currentTimeMillis() - start;
-      if(timeTaken > 5) {
-        log.info("zkClient.exists({}):  {}", collectionPath,timeTaken );
-      }
-    } catch (InterruptedException ie) {
-      Thread.currentThread().interrupt();
-      return null;
-    } catch (Exception e) {
-      log.warn("unexpected exception: ",e);
-      return null;
-    }
-    if (stat != null) {
-      if (stat.getVersion() > c.getZNodeVersion()) return null;
-      if (!c.isModified(stat.getVersion(), stat.getCversion())) {
-        // we have the latest collection state
-        return c;
-      }
-      if (c.isPerReplicaState() && c.getChildNodesVersion() < stat.getCversion()) {
-        // only PRS is modified. just fetch it and return the new collection
-        return c.copyWith(PerReplicaStatesFetcher.fetch(collectionPath, zkClient, null));
-      }
-    }
-    return null;
-  }
-
   private DocCollection fetchCollectionState(String coll, Watcher watcher)
       throws KeeperException, InterruptedException {
     String collectionPath = DocCollection.getCollectionPath(coll);
@@ -1909,20 +1863,9 @@ public class ZkStateReader implements SolrCloseable {
   public void waitForState(
       final String collection, long wait, TimeUnit unit, CollectionStatePredicate predicate)
       throws InterruptedException, TimeoutException {
+
     if (closed) {
       throw new AlreadyClosedException();
-    }
-    DocCollection coll = null;
-    try {
-      coll = getCollandLog(collection);
-    } catch (Exception e) {
-      log.warn("fetch threw exception",e);
-      //do not do anything
-    }
-    if (coll != null && predicate.matches(liveNodes, coll)) {
-      return;
-    } else {
-      log.info("registering actual watcher");
     }
 
     final CountDownLatch latch = new CountDownLatch(1);
@@ -1938,12 +1881,7 @@ public class ZkStateReader implements SolrCloseable {
         };
 
     try {
-      long start = System.currentTimeMillis();
       registerCollectionStateWatcher(collection, watcher);
-      long timeTaken = System.currentTimeMillis() - start;
-      if(timeTaken>5) {
-        log.info("registerCollectionStateWatcher {}ms", timeTaken);
-      }
       // wait for the watcher predicate to return true, or time out
       if (!latch.await(wait, unit))
         throw new TimeoutException(
@@ -1955,26 +1893,6 @@ public class ZkStateReader implements SolrCloseable {
     } finally {
       removeCollectionStateWatcher(collection, watcher);
       waitLatches.remove(latch);
-    }
-  }
-
-  private DocCollection getCollandLog(String collection) {
-    long start = System.currentTimeMillis();
-    try {
-      return fetchCachedCollection(collection);
-    } finally {
-      long time = System.currentTimeMillis() - start;
-      if(time > 5) {
-        StringBuilder sb = new StringBuilder();
-        StackTraceElement[] st = new RuntimeException().getStackTrace();
-        for (int i = 1; i < 5; i++) {
-          StackTraceElement e = st[i];
-          sb.append(e.getMethodName()).append("@").append(e.getLineNumber()).append(" > ");
-        }
-
-        log.info("fetchCachedCollection. Waited {} callstack : {}", time, sb);
-      }
-
     }
   }
 
@@ -1996,21 +1914,13 @@ public class ZkStateReader implements SolrCloseable {
   public DocCollection waitForState(
       final String collection, long wait, TimeUnit unit, Predicate<DocCollection> predicate)
       throws InterruptedException, TimeoutException {
-
     if (log.isDebugEnabled()) {
       log.debug("Waiting up to {}ms for state {}", unit.toMillis(wait), predicate);
     }
     if (closed) {
       throw new AlreadyClosedException();
     }
-    DocCollection coll = null;
-    try {
-      coll = getCollandLog(collection);
-    } catch (Exception e) {
-      log.warn("fetch threw exception",e);
-      //do not do anything
-    }
-    if (coll != null && predicate.test(coll)) return coll;
+
     final CountDownLatch latch = new CountDownLatch(1);
     waitLatches.add(latch);
     AtomicReference<DocCollection> docCollection = new AtomicReference<>();
@@ -2024,12 +1934,7 @@ public class ZkStateReader implements SolrCloseable {
         };
 
     try {
-      long start = System.currentTimeMillis();
       registerDocCollectionWatcher(collection, watcher);
-      long timeTaken = System.currentTimeMillis() - start;
-      if(timeTaken>5) {
-        log.info("registerCollectionStateWatcher {}ms", timeTaken);
-      }
       // wait for the watcher predicate to return true, or time out
       if (!latch.await(wait, unit))
         throw new TimeoutException(

@@ -168,16 +168,8 @@ public class DistributedZkUpdateProcessor extends DistributedUpdateProcessor {
     List<SolrCmdDistributor.Node> nodes = null;
     Replica leaderReplica = null;
     zkCheck();
-    try {
-      leaderReplica =
-          zkController.getZkStateReader().getLeaderRetry(collection, cloudDesc.getShardId());
-    } catch (InterruptedException e) {
-      Thread.interrupted();
-      throw new SolrException(
-          SolrException.ErrorCode.SERVICE_UNAVAILABLE,
-          "Exception finding leader for shard " + cloudDesc.getShardId(),
-          e);
-    }
+    DocCollection c = zkController.getZkStateReader().getClusterState().getCollection(collection);
+    leaderReplica = ZkStateReader.getLeader(zkController.getZkStateReader().getClusterState().getLiveNodes(), c, cloudDesc.getShardId());
     isLeader = leaderReplica.getName().equals(cloudDesc.getCoreNodeName());
 
     nodes = getCollectionUrls(collection, EnumSet.of(Replica.Type.TLOG, Replica.Type.NRT), true);
